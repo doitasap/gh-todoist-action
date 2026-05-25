@@ -1,0 +1,49 @@
+name: 'Todoist Sync from GitHub Issue'
+description: 'Sync GitHub issue events (opened/closed) to Todoist tasks. Resolves project by name and matches existing tasks by [#N] prefix + issue URL.'
+author: 'doitasap'
+branding:
+  icon: 'check-square'
+  color: 'red'
+
+inputs:
+  mode:
+    description: 'Action mode: "create-task" or "close-by-issue"'
+    required: true
+  project-name:
+    description: 'Todoist project name (exact match, e.g. "link-drawer", "got-wa")'
+    required: true
+  labels:
+    description: 'Comma-separated label names attached to the created Todoist task (only used by create-task)'
+    required: false
+    default: 'Github issue'
+  issue-number:
+    description: 'GitHub issue number (default: github.event.issue.number)'
+    required: false
+    default: ${{ github.event.issue.number }}
+  issue-title:
+    description: 'GitHub issue title (default: github.event.issue.title)'
+    required: false
+    default: ${{ github.event.issue.title }}
+  issue-url:
+    description: 'GitHub issue HTML URL (default: github.event.issue.html_url)'
+    required: false
+    default: ${{ github.event.issue.html_url }}
+  issue-body:
+    description: 'GitHub issue body (default: github.event.issue.body)'
+    required: false
+    default: ${{ github.event.issue.body }}
+
+runs:
+  using: composite
+  steps:
+    - name: Run Todoist client
+      shell: bash
+      env:
+        ACTION_MODE: ${{ inputs.mode }}
+        PROJECT_NAME: ${{ inputs.project-name }}
+        LABELS: ${{ inputs.labels }}
+        ISSUE_NUMBER: ${{ inputs.issue-number }}
+        ISSUE_TITLE: ${{ inputs.issue-title }}
+        ISSUE_URL: ${{ inputs.issue-url }}
+        ISSUE_BODY: ${{ inputs.issue-body }}
+      run: python3 "$GITHUB_ACTION_PATH/scripts/todoist_client.py"
