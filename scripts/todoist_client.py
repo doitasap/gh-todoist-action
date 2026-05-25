@@ -60,8 +60,27 @@ def _truncate_bytes(text, max_bytes):
 
 
 def _parse_labels():
-    """LABELS 환경변수를 콤마 구분으로 파싱하고 공백·빈 토큰 제거."""
-    raw = os.environ.get("LABELS", DEFAULT_LABELS) or DEFAULT_LABELS
+    """LABELS 환경변수 파싱.
+
+    지원 포맷:
+    - JSON 배열 (콤마 포함 라벨 안전): '["곧, 와","Github issue"]'
+    - 콤마 구분 (단순 표기): '링크서랍,Github issue'
+
+    첫 글자가 '['이면 JSON으로 해석하며, 실패 시 명시적 에러로 종료.
+    """
+    raw = (os.environ.get("LABELS", DEFAULT_LABELS) or DEFAULT_LABELS).strip()
+    if not raw:
+        return [DEFAULT_LABELS]
+    if raw.startswith("["):
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError as e:
+            print(
+                "❌ LABELS JSON 파싱 실패: " + str(e) + " (input: " + raw + ")",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        return [str(label).strip() for label in parsed if str(label).strip()]
     return [label.strip() for label in raw.split(",") if label.strip()]
 
 

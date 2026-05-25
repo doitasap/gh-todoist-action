@@ -13,7 +13,7 @@ inputs:
     description: 'Todoist project name (exact match, e.g. "link-drawer", "got-wa")'
     required: true
   labels:
-    description: 'Comma-separated label names attached to the created Todoist task (only used by create-task)'
+    description: 'Labels attached to the created Todoist task (only used by create-task). Accepts comma-separated string (e.g. "링크서랍,Github issue") or JSON array string for labels containing commas (e.g. ''["곧, 와","Github issue"]'').'
     required: false
     default: 'Github issue'
   issue-number:

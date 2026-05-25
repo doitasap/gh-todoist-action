@@ -35,13 +35,16 @@ jobs:
   create-todoist-task:
     runs-on: ubuntu-latest
     steps:
-      - uses: doitasap/gh-todoist-action@v1
+      - uses: doitasap/gh-todoist-action@v1.1.0
         with:
           mode: create-task
           project-name: link-drawer
           labels: "링크서랍,Github issue"
         env:
           TODOIST_TOKEN: ${{ secrets.TODOIST_API_TOKEN }}
+
+# 라벨에 콤마가 포함되는 경우 JSON 배열 사용:
+#   labels: '["곧, 와","Github issue"]'
 ```
 
 ### 모드 2: 이슈 종료 시 업무 완료
@@ -59,7 +62,7 @@ jobs:
   close-todoist-task:
     runs-on: ubuntu-latest
     steps:
-      - uses: doitasap/gh-todoist-action@v1
+      - uses: doitasap/gh-todoist-action@v1.1.0
         with:
           mode: close-by-issue
           project-name: link-drawer
@@ -75,7 +78,7 @@ jobs:
 |-------|------|--------|------|
 | `mode` | ✓ | — | `create-task` 또는 `close-by-issue` |
 | `project-name` | ✓ | — | Todoist 프로젝트명 (정확히 일치) |
-| `labels` | — | `Github issue` | `create-task` 시 부착할 라벨 (콤마 구분). 빈 토큰·공백 자동 제거 |
+| `labels` | — | `Github issue` | `create-task` 시 부착할 라벨. 콤마 구분(`"링크서랍,Github issue"`) 또는 JSON 배열(`'["곧, 와","Github issue"]'`) 지원. 콤마를 포함한 라벨이면 JSON 사용 |
 | `issue-number` | — | `${{ github.event.issue.number }}` | GitHub 이슈 번호 |
 | `issue-title` | — | `${{ github.event.issue.title }}` | 이슈 제목 (`create-task`에서만 사용) |
 | `issue-url` | — | `${{ github.event.issue.html_url }}` | 이슈 URL |
@@ -112,10 +115,12 @@ jobs:
 
 ## Versioning
 
-- `v1` (메이저 무빙 태그) — 패치 자동 수령
-- `v1.0.0`, `v1.0.1` (고정 태그) — 특정 버전 핀 고정 시
+| 태그 | 변경점 |
+|------|--------|
+| v1.0.0 | 초기 릴리스. `create-task` / `close-by-issue` 2가지 모드, 콤마 구분 라벨 |
+| v1.1.0 | `labels` input에 JSON 배열 지원 (콤마 포함 라벨 안전) |
 
-호출 측 권장: `uses: doitasap/gh-todoist-action@v1`
+호출 측 권장: `uses: doitasap/gh-todoist-action@v1.1.0` (또는 더 새 버전).
 
 ---
 
