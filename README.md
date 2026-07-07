@@ -2,8 +2,8 @@
 
 GitHub Issue 이벤트(opened/closed)를 Todoist 업무로 자동 동기화하는 GitHub Composite Action.
 
-- **opened** 이벤트 → 지정한 Todoist 프로젝트에 `[#N] 제목` 형식의 업무 생성
-- **closed** 이벤트 → 동일 프로젝트에서 `[#N]` 접두사 + issue URL 매칭하여 업무 완료 처리
+- **opened** 이벤트 → 지정한 Todoist 프로젝트에 `[#N] 제목` 형식의 업무 생성 (`create-task`)
+- **closed** 이벤트 → `[#N]` 접두사 + issue URL 매칭 후 업무 **완료 처리**(`close-by-issue`) 또는 완료 대신 **라벨 부착**(`label-by-issue`, 예: `배포 대기`)
 
 Python 3 표준 라이브러리만 사용하여 외부 의존성이 없으며, `actions/setup-python` 없이 GitHub-hosted runner의 기본 Python 3로 동작합니다.
 
@@ -35,7 +35,7 @@ jobs:
   create-todoist-task:
     runs-on: ubuntu-latest
     steps:
-      - uses: doitasap/gh-todoist-action@v1.1.0
+      - uses: doitasap/gh-todoist-action@v1.2.0
         with:
           mode: create-task
           project-name: link-drawer
@@ -62,7 +62,7 @@ jobs:
   close-todoist-task:
     runs-on: ubuntu-latest
     steps:
-      - uses: doitasap/gh-todoist-action@v1.1.0
+      - uses: doitasap/gh-todoist-action@v1.2.0
         with:
           mode: close-by-issue
           project-name: link-drawer
@@ -70,15 +70,44 @@ jobs:
           TODOIST_TOKEN: ${{ secrets.TODOIST_API_TOKEN }}
 ```
 
+### 모드 3: 이슈 종료 시 배포 대기 라벨 부착 (완료 대신)
+
+개발 완료(Issue close)와 배포 완료를 분리하고 싶을 때 사용합니다. 태스크를 **완료하지 않고** 지정 라벨을 **추가(union)** 하여, 배포 전까지 업무를 살아있는 상태로 유지합니다. (모드 2와 택일)
+
+`.github/workflows/issue-closed-to-todoist.yml`:
+
+```yaml
+name: Issue 종료 → Todoist 배포 대기 라벨
+
+on:
+  issues:
+    types: [closed]
+
+jobs:
+  label-todoist-task:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: doitasap/gh-todoist-action@v1.2.0
+        with:
+          mode: label-by-issue
+          project-name: link-drawer
+          labels: "배포 대기"      # Todoist 라벨명(공백 포함)과 정확히 일치, 반드시 명시
+        env:
+          TODOIST_TOKEN: ${{ secrets.TODOIST_API_TOKEN }}
+```
+
+- 기존 라벨 보존 · 순서 보존 · 중복 제거(멱등). 이미 라벨이 있으면 API를 호출하지 않습니다.
+- `labels` 미지정 시 기본값 `Github issue`가 부착되므로 **반드시 명시**하세요.
+
 ---
 
 ## Inputs
 
 | Input | 필수 | 기본값 | 설명 |
 |-------|------|--------|------|
-| `mode` | ✓ | — | `create-task` 또는 `close-by-issue` |
+| `mode` | ✓ | — | `create-task` \| `close-by-issue` \| `label-by-issue` |
 | `project-name` | ✓ | — | Todoist 프로젝트명 (정확히 일치) |
-| `labels` | — | `Github issue` | `create-task` 시 부착할 라벨. 콤마 구분(`"링크서랍,Github issue"`) 또는 JSON 배열(`'["곧, 와","Github issue"]'`) 지원. 콤마를 포함한 라벨이면 JSON 사용 |
+| `labels` | — | `Github issue` | 라벨. `create-task`는 생성 태스크의 **전체 라벨 집합(SET)**, `label-by-issue`는 기존 라벨에 **추가할 라벨(ADD/union)**. 콤마 구분(`"링크서랍,Github issue"`) 또는 JSON 배열(`'["곧, 와","Github issue"]'`) 지원. `label-by-issue`에서는 반드시 명시 |
 | `issue-number` | — | `${{ github.event.issue.number }}` | GitHub 이슈 번호 |
 | `issue-title` | — | `${{ github.event.issue.title }}` | 이슈 제목 (`create-task`에서만 사용) |
 | `issue-url` | — | `${{ github.event.issue.html_url }}` | 이슈 URL |
@@ -111,6 +140,13 @@ jobs:
 3. 매칭 시 `POST /tasks/{id}/close` 호출
 4. 매칭 실패 시 경고만 출력하고 종료 코드 0 (실패 아님)
 
+### label-by-issue
+
+1. 프로젝트 ID 조회 후 `[#N]` 접두사 + URL 매칭 (`close-by-issue`와 동일 탐색 로직)
+2. `merged = 기존 라벨 + (추가 라벨 중 없는 것)` — 순서 보존·중복 제거
+3. 변경이 있으면 `POST /tasks/{id}` body `{"labels": [...]}` 호출, 없으면(멱등) 미호출
+4. 매칭 실패 시 경고만 출력하고 종료 코드 0 (실패 아님)
+
 ---
 
 ## Versioning
@@ -119,8 +155,9 @@ jobs:
 |------|--------|
 | v1.0.0 | 초기 릴리스. `create-task` / `close-by-issue` 2가지 모드, 콤마 구분 라벨 |
 | v1.1.0 | `labels` input에 JSON 배열 지원 (콤마 포함 라벨 안전) |
+| v1.2.0 | `label-by-issue` 모드 추가 — Issue close 시 완료 대신 라벨 부착(union·멱등). 개발 완료와 배포 완료 분리 |
 
-호출 측 권장: `uses: doitasap/gh-todoist-action@v1.1.0` (또는 더 새 버전).
+호출 측 권장: `uses: doitasap/gh-todoist-action@v1.2.0` (또는 더 새 버전).
 
 ---
 
