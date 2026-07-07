@@ -4,10 +4,11 @@
 
 필수 환경 변수:
     TODOIST_TOKEN
-    ACTION_MODE: "create-task" | "close-by-issue"
+    ACTION_MODE: "create-task" | "close-by-issue" | "label-by-issue"
     PROJECT_NAME
     create-task: ISSUE_NUMBER, ISSUE_TITLE, ISSUE_URL, ISSUE_BODY, LABELS
     close-by-issue: ISSUE_NUMBER, ISSUE_URL
+    label-by-issue: ISSUE_NUMBER, ISSUE_URL, LABELS
 """
 
 import json
@@ -141,16 +142,13 @@ def create_task():
     print("✅ Todoist 업무 생성 완료 (task_id: " + str(task_id) + ")")
 
 
-def close_by_issue():
-    issue_number = os.environ["ISSUE_NUMBER"]
-    issue_url = os.environ["ISSUE_URL"]
+def _find_task_by_issue(project_id, issue_number, issue_url):
+    """[#N] prefix(content) + issue_url(description) 매칭 태스크 dict 반환. 없으면 None.
 
-    project_id = _resolve_project_id(os.environ["PROJECT_NAME"])
-
+    close-by-issue / label-by-issue 공통 탐색 로직. 첫 매칭 1건만 반환한다.
+    """
     prefix = "[#" + issue_number + "]"
-    match_id = None
     cursor = None
-
     while True:
         path = "/tasks?project_id=" + urllib.parse.quote(str(project_id), safe="")
         if cursor:
@@ -168,19 +166,51 @@ def close_by_issue():
             content = t.get("content", "")
             description = t.get("description", "")
             if content.startswith(prefix) and issue_url in description:
-                match_id = t["id"]
-                break
+                return t
 
-        if match_id or not next_cursor:
+        if not next_cursor:
             break
         cursor = next_cursor
 
-    if not match_id:
+    return None
+
+
+def close_by_issue():
+    issue_number = os.environ["ISSUE_NUMBER"]
+    issue_url = os.environ["ISSUE_URL"]
+    project_id = _resolve_project_id(os.environ["PROJECT_NAME"])
+
+    task = _find_task_by_issue(project_id, issue_number, issue_url)
+    if task is None:
         print("⚠️  매칭되는 Todoist 업무가 없습니다 (issue #" + issue_number + ")")
         sys.exit(0)
 
-    _request("POST", "/tasks/" + match_id + "/close")
-    print("✅ Todoist 업무 완료 처리 (task_id: " + match_id + ")")
+    _request("POST", "/tasks/" + task["id"] + "/close")
+    print("✅ Todoist 업무 완료 처리 (task_id: " + task["id"] + ")")
+
+
+def label_by_issue():
+    """매칭 태스크에 지정 라벨을 추가(union). 기존 라벨 보존, 멱등."""
+    issue_number = os.environ["ISSUE_NUMBER"]
+    issue_url = os.environ["ISSUE_URL"]
+    project_id = _resolve_project_id(os.environ["PROJECT_NAME"])
+    add_labels = _parse_labels()  # LABELS 환경변수 = 추가할 라벨
+
+    task = _find_task_by_issue(project_id, issue_number, issue_url)
+    if task is None:
+        print("⚠️  매칭되는 Todoist 업무가 없습니다 (issue #" + issue_number + ")")
+        sys.exit(0)
+
+    current = task.get("labels", []) or []
+    merged = current + [lbl for lbl in add_labels if lbl not in current]
+
+    if merged == current:
+        print("ℹ️  이미 라벨이 부착되어 있습니다 (task_id: " + task["id"] + ")")
+        return
+
+    _request("POST", "/tasks/" + task["id"], {"labels": merged})
+    print("✅ Todoist 라벨 부착 완료 (task_id: " + task["id"]
+          + ", labels: " + ",".join(merged) + ")")
 
 
 def main():
@@ -189,11 +219,13 @@ def main():
         create_task()
     elif mode == "close-by-issue":
         close_by_issue()
+    elif mode == "label-by-issue":
+        label_by_issue()
     else:
         print(
             "❌ ACTION_MODE가 올바르지 않습니다: "
             + repr(mode)
-            + " (허용: create-task, close-by-issue)",
+            + " (허용: create-task, close-by-issue, label-by-issue)",
             file=sys.stderr,
         )
         sys.exit(1)

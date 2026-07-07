@@ -1,5 +1,5 @@
 name: 'Todoist Sync from GitHub Issue'
-description: 'Sync GitHub issue events (opened/closed) to Todoist tasks. Resolves project by name and matches existing tasks by [#N] prefix + issue URL.'
+description: 'Sync GitHub issue events (opened/closed) to Todoist tasks. Modes: create-task, close-by-issue, label-by-issue. Resolves project by name and matches existing tasks by [#N] prefix + issue URL.'
 author: 'doitasap'
 branding:
   icon: 'check-square'
@@ -7,13 +7,13 @@ branding:
 
 inputs:
   mode:
-    description: 'Action mode: "create-task" or "close-by-issue"'
+    description: 'Action mode: "create-task" | "close-by-issue" | "label-by-issue"'
     required: true
   project-name:
     description: 'Todoist project name (exact match, e.g. "link-drawer", "got-wa")'
     required: true
   labels:
-    description: 'Labels attached to the created Todoist task (only used by create-task). Accepts comma-separated string (e.g. "링크서랍,Github issue") or JSON array string for labels containing commas (e.g. ''["곧, 와","Github issue"]'').'
+    description: 'Labels for the Todoist task. Used by create-task (full label SET on the created task) and label-by-issue (labels to ADD/union onto the matched task, preserving existing labels). Accepts comma-separated string (e.g. "링크서랍,Github issue") or JSON array string for labels containing commas (e.g. ''["곧, 와","Github issue"]''). NOTE: for label-by-issue, always set this explicitly — the default below will otherwise attach "Github issue".'
     required: false
     default: 'Github issue'
   issue-number:
